@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -10,6 +11,10 @@ public class SocketClient {
     private static ManualResetEvent connectDone = new ManualResetEvent(false);
     private static ManualResetEvent sendDone = new ManualResetEvent(false);
     private static ManualResetEvent receiveDone = new ManualResetEvent(false);
+
+    private static Dictionary<int, ManualResetEvent> receivedTiming = new Dictionary<int, ManualResetEvent>();
+
+    private static int lastReceivedPingIndex = -1;
 
     public static int Main(String[] args) {
         StartClient();
@@ -31,8 +36,8 @@ public class SocketClient {
 
                 for (int i = 0; i < 500; i++) {
                     Send(socket, "ping;" + i + ";#<EOS>");
+                    CountResponseTime(i);
                     sendDone.WaitOne();
-                    Thread.Sleep(1);
                 }
 
                 receiveDone.WaitOne();
@@ -49,9 +54,18 @@ public class SocketClient {
             }
 
         } catch (Exception e) {
-            Console.WriteLine("Outer exception!");
             Console.WriteLine(e.ToString());
         }
+    }
+
+    private static void CountResponseTime(int i)
+    {
+        receivedTiming.Add(i, new ManualResetEvent(false));
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        receivedTiming[i].WaitOne();
+        watch.Stop();
+
+        Console.WriteLine("=> Time elapsed: {0}ms", watch.ElapsedMilliseconds);
     }
 
     private static void ConnectCallback(IAsyncResult ar) {
@@ -77,7 +91,7 @@ public class SocketClient {
         try {
             State state = (State) ar.AsyncState;
             Socket client = state.socket;
-            String data = "";
+            string data = "";
 
             int bytesRead = client.EndReceive(ar);
 
@@ -88,6 +102,16 @@ public class SocketClient {
 
             if (data.Length > 1) {
                 data = data.Remove(data.IndexOf("<EOS>"), "<EOS>".Length);
+
+                int pingIndexReceived = Utils.getIndexFromPing(data);
+                receivedTiming[pingIndexReceived].Set();
+
+                if(pingIndexReceived != lastReceivedPingIndex + 1)
+                {
+                    Console.WriteLine("=====> Pulou!");
+                }
+
+                lastReceivedPingIndex++;
                 Console.WriteLine("=> Received: {0}", data);
             }
             receiveDone.Set();

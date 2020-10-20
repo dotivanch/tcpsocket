@@ -5,15 +5,6 @@ using System.Text;
 using System.Threading;
 using Common;
 
-public class Utils {
-
-    private const int PING_INDEX_ID = 1;
-
-    public static int getIndexFromPing(string data) {
-        return Convert.ToInt32(data.Split(';')[PING_INDEX_ID]);
-    }
-
-}
 
 public class SocketListener
 {
@@ -84,7 +75,9 @@ public class SocketListener
             }
 
             socket.BeginReceive(state.buffer, 0, State.BUFFER_SIZE, 0, new AsyncCallback(ReadCallback), state);
-        } catch (Exception e) {
+        }
+        catch (Exception e)
+        {
             Console.WriteLine("Connection closed!");
             socket.Shutdown(SocketShutdown.Both);
             socket.Close();
